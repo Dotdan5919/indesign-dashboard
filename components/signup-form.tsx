@@ -44,7 +44,7 @@ if(e.target.password_1!=e.target.password_2)
 
 
 }
-test
+
 
 
 
