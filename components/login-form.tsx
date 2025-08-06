@@ -6,6 +6,7 @@
   import Link from "next/link"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import { Spinner } from "@/components/ui/spinner"
 
 interface formData{
 
@@ -93,7 +94,7 @@ const handleSubmit = async (e) => {
             <Input id="password" type="password" onChange={handleChange} name="password"  required />
           </div>
           <Button type="submit" className="w-full" disabled={isLoading} >
-            Login
+          {isLoading?(<Spinner size="medium"/>):"Login" }   
           </Button>
           {error && <div className="text-red-500 text-sm text-center">{error}</div>}
           <div className="after:border-border relative text-center text-sm after:absolute after:inset-0 after:top-1/2 after:z-0 after:flex after:items-center after:border-t">

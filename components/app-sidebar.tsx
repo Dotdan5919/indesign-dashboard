@@ -37,6 +37,12 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 
+import useProfile from "@/hooks/useProfile"
+
+
+
+
+
 const data = {
   user: {
     name: "shadcn",
@@ -136,11 +142,12 @@ const data = {
     },
   ],
   documents: [
-   
+    
   ],
 }
 
 export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
+  const {profile,isLoading}=useProfile();
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
@@ -162,7 +169,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
         <NavSecondary items={data.navSecondary} className="mt-auto"  />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser user={profile} />
       </SidebarFooter>
     </Sidebar>
   );
