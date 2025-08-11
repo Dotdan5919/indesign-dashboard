@@ -62,6 +62,8 @@ const handleSubmit = async (e) => {
     // Assume backend sets HTTP-only cookie
     await res.json();
     router.push('/dashboard');
+
+    
   } catch (err) {
     setError(err.message || 'An error occurred');
   }
@@ -116,9 +118,9 @@ const handleSubmit = async (e) => {
         </Button>
       </div>
       <div className="text-center text-sm">
-        Don&apos;t have an account?{" "}
-        <Link href="#" className="underline underline-offset-4">
-          Sign up
+        Already have an account?{" "}
+        <Link href="/login" className="underline underline-offset-4">
+         Login
         </Link>
       </div>
     </form>
