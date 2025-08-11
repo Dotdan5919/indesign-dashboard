@@ -148,6 +148,10 @@ const data = {
 
 export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const {profile,isLoading}=useProfile();
+
+  if (isLoading) {
+    return null; // or a loading spinner
+  }
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>

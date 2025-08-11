@@ -14,6 +14,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Skeleton } from "@/components/ui/skeleton"
 import ProfileProvider from "@/context/ProfileContext"
+import Dashboardbody from "@/components/dashboardbody"
 
 export default function Page() {
 
@@ -30,20 +31,11 @@ export default function Page() {
       }
     >
       <AppSidebar variant="inset" />
-      <SidebarInset>
-        <SiteHeader />
-        <div className="flex flex-1 flex-col">
-          <div className="@container/main flex flex-1 flex-col gap-2">
-            <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
-              <SectionCards />
-              <div className="px-4 lg:px-6">
-                <ChartAreaInteractive />
-              </div>
-              <DataTable data={data} />
-            </div>
-          </div>
-        </div>
-      </SidebarInset>
+     
+
+
+
+     <Dashboardbody />
     </SidebarProvider>
     </ProfileProvider>
   )
