@@ -8,9 +8,11 @@ import {
   SidebarInset,
   SidebarProvider,
 } from "@/components/ui/sidebar"
+import ProfileProvider from "@/context/ProfileContext"
 
 export default function NewBlogPage() {
   return (
+    <ProfileProvider>
     <SidebarProvider
       style={
         {
@@ -46,5 +48,6 @@ export default function NewBlogPage() {
         </div>
       </SidebarInset>
     </SidebarProvider>
+    </ProfileProvider>
   )
 } 

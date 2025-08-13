@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -30,103 +30,105 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
-import { Edit, MoreHorizontal, Trash2, Eye, Package } from "lucide-react"
+import { Edit, MoreHorizontal, Trash2, Eye, Package, Image as ImageIcon } from "lucide-react"
+import { deleteProduct, fetchProducts, getProductPrimaryImageUrl, updateProduct, type Product } from "@/lib/api"
+import { useRouter } from "next/navigation"
 
-interface Product {
-  id: string
-  name: string
-  description: string
-  price: number
-  comparePrice?: number
-  category: string
-  status: "active" | "inactive" | "out_of_stock"
-  stock: number
-  sku: string
-  shopId: string
-  createdAt: string
-  updatedAt: string
-}
-
-const mockProducts: Product[] = [
-  {
-    id: "1",
-    name: "Wireless Bluetooth Headphones",
-    description: "High-quality wireless headphones with noise cancellation",
-    price: 99.99,
-    comparePrice: 129.99,
-    category: "Electronics",
-    status: "active",
-    stock: 45,
-    sku: "WH-001",
-    shopId: "1",
-    createdAt: "2024-01-15",
-    updatedAt: "2024-01-20"
-  },
-  {
-    id: "2",
-    name: "Organic Cotton T-Shirt",
-    description: "Comfortable organic cotton t-shirt in various colors",
-    price: 24.99,
-    category: "Clothing",
-    status: "active",
-    stock: 120,
-    sku: "TS-002",
-    shopId: "2",
-    createdAt: "2024-01-18",
-    updatedAt: "2024-01-18"
-  },
-  {
-    id: "3",
-    name: "Smart Home Security Camera",
-    description: "1080p HD security camera with night vision",
-    price: 149.99,
-    comparePrice: 199.99,
-    category: "Home & Garden",
-    status: "out_of_stock",
-    stock: 0,
-    sku: "SC-003",
-    shopId: "3",
-    createdAt: "2024-01-10",
-    updatedAt: "2024-01-15"
-  }
-]
+type EditableProduct = Product & { imageFiles?: File[] }
 
 export function ProductsTable() {
-  const [products, setProducts] = useState<Product[]>(mockProducts)
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null)
+  const router = useRouter()
+  const [products, setProducts] = useState<Product[]>([])
+  const [loading, setLoading] = useState<boolean>(true)
+  const [error, setError] = useState<string | null>(null)
+  const [editingProduct, setEditingProduct] = useState<EditableProduct | null>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+
+  useEffect(() => {
+    let ignore = false
+    ;(async () => {
+      try {
+        setLoading(true)
+        const data = await fetchProducts()
+        if (!ignore) {
+          setProducts(data)
+        }
+      } catch (e: any) {
+        if (!ignore) {
+          if (e?.message?.includes("Authentication required")) {
+            router.push("/login")
+          } else {
+            setError(e?.message || "Failed to load products")
+          }
+        }
+      } finally {
+        if (!ignore) setLoading(false)
+      }
+    })()
+    return () => {
+      ignore = true
+    }
+  }, [])
 
   const handleEdit = (product: Product) => {
     setEditingProduct(product)
     setIsEditDialogOpen(true)
   }
 
-  const handleDelete = (id: string) => {
-    setProducts(products.filter(product => product.id !== id))
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteProduct(id)
+      setProducts((prev) => prev.filter((p) => p._id !== id))
+    } catch (e: any) {
+      if (e?.message?.includes("Authentication required")) {
+        router.push("/login")
+      } else {
+        alert(e?.message || "Failed to delete product")
+      }
+    }
   }
 
-  const handleSave = (updatedProduct: Product) => {
-    setProducts(products.map(product => 
-      product.id === updatedProduct.id ? updatedProduct : product
-    ))
-  image: string // URL to product image
-    setIsEditDialogOpen(false)
-    setEditingProduct(null)
+  const handleSave = async () => {
+    if (!editingProduct) return
+    try {
+      const { _id, imageFiles, images, createdAt, updatedAt, slug, ...rest } = editingProduct
+      const updated = await updateProduct(
+        _id,
+        {
+          name: rest.name,
+          description: rest.description,
+          price: rest.price,
+          stock: rest.stock,
+          category: rest.category,
+          status: rest.status,
+        },
+        imageFiles
+      )
+      setProducts((prev) => prev.map((p) => (p._id === updated._id ? updated : p)))
+      setIsEditDialogOpen(false)
+      setEditingProduct(null)
+    } catch (e: any) {
+      if (e?.message?.includes("Authentication required")) {
+        router.push("/login")
+      } else {
+        alert(e?.message || "Failed to update product")
+      }
+    }
   }
 
-  const getStatusBadge = (status: string) => {
-    const variants = {
+  const getStatusBadge = (status: Product["status"]) => {
+    const variants: Record<string, string> = {
       active: "bg-green-100 text-green-800",
       inactive: "bg-gray-100 text-gray-800",
-      out_of_stock: "bg-red-100 text-red-800"
+      draft: "bg-yellow-100 text-yellow-800",
+      discontinued: "bg-red-100 text-red-800",
     }
     return (
-      <Badge className={variants[status as keyof typeof variants]}>
-        {status.replace('_', ' ')}
+      <Badge className={variants[status] || "bg-gray-100 text-gray-800"}>
+        {status}
       </Badge>
     )
   }
-    image: "/headphones.svg"
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -135,85 +137,87 @@ export function ProductsTable() {
     }).format(amount)
   }
 
+  if (loading) {
+    return <div className="p-4">Loading products...</div>
+  }
+  if (error) {
+    return <div className="p-4 text-red-600">{error}</div>
+  }
+
   return (
     <div className="space-y-4">
       <div className="rounded-md border">
         <Table>
           <TableHeader>
-    image: "/tshirt.svg"
             <TableRow>
               <TableHead>Product</TableHead>
+              <TableHead>Image</TableHead>
               <TableHead>Category</TableHead>
               <TableHead>Price</TableHead>
               <TableHead>Stock</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>SKU</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {products.map((product) => (
-              <TableRow key={product.id}>
-                <TableCell className="font-medium">
-    image: "/camera.svg"
-                  <div className="flex items-center gap-2">
-                    <Package className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <div className="font-medium">{product.name}</div>
-                      <div className="text-sm text-muted-foreground line-clamp-1">
-                        {product.description}
+            {products.map((product) => {
+              const imageUrl = getProductPrimaryImageUrl(product)
+              return (
+                <TableRow key={product._id}>
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-2">
+                      <Package className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <div className="font-medium">{product.name}</div>
+                        <div className="text-sm text-muted-foreground line-clamp-1">
+                          {product.description}
+                        </div>
                       </div>
                     </div>
-                  </div>
-            <TableHead>Image</TableHead>
-                </TableCell>
-                <TableCell>{product.category}</TableCell>
-                <TableCell>
-                  <div className="flex flex-col">
-                    <span className="font-medium">{formatCurrency(product.price)}</span>
-                    {product.comparePrice && (
-                      <span className="text-sm text-muted-foreground line-through">
-                        {formatCurrency(product.comparePrice)}
-                      </span>
+                  </TableCell>
+                  <TableCell>
+                    {imageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={imageUrl} alt={product.name} className="w-16 h-16 object-cover rounded" />
+                    ) : (
+                      <div className="w-16 h-16 border rounded flex items-center justify-center text-muted-foreground">
+                        <ImageIcon className="h-6 w-6" />
+                      </div>
                     )}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <img src={product.image} alt={product.name} className="w-16 h-16 object-cover rounded" />
-                </TableCell>
-                <TableCell>{product.stock}</TableCell>
-                <TableCell>{getStatusBadge(product.status)}</TableCell>
-                <TableCell className="text-muted-foreground">{product.sku}</TableCell>
-                <TableCell className="text-right">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" className="h-8 w-8 p-0">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                      <DropdownMenuItem>
-                        <Eye className="mr-2 h-4 w-4" />
-                        View Product
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleEdit(product)}>
-                        <Edit className="mr-2 h-4 w-4" />
-                        Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem 
-                        onClick={() => handleDelete(product.id)}
-                        className="text-red-600"
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-              </TableRow>
-            ))}
+                  </TableCell>
+                  <TableCell>{product.category}</TableCell>
+                  <TableCell>
+                    <span className="font-medium">{formatCurrency(product.price)}</span>
+                  </TableCell>
+                  <TableCell>{product.stock}</TableCell>
+                  <TableCell>{getStatusBadge(product.status)}</TableCell>
+                  <TableCell className="text-right">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="h-8 w-8 p-0">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                        <DropdownMenuItem onClick={() => handleEdit(product)}>
+                          <Edit className="mr-2 h-4 w-4" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem 
+                          onClick={() => handleDelete(product._id)}
+                          className="text-red-600"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              )
+            })}
           </TableBody>
         </Table>
       </div>
@@ -223,7 +227,7 @@ export function ProductsTable() {
           <DialogHeader>
             <DialogTitle>Edit Product</DialogTitle>
             <DialogDescription>
-              Make changes to your product here. Click save when you&apos;re done.
+              Make changes to your product here. Click save when you are done.
             </DialogDescription>
           </DialogHeader>
           {editingProduct && (
@@ -296,14 +300,28 @@ export function ProductsTable() {
                   value={editingProduct.status}
                   onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setEditingProduct({
                     ...editingProduct,
-                    status: e.target.value as "active" | "inactive" | "out_of_stock"
+                    status: e.target.value as Product["status"],
                   })}
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <option value="active">Active</option>
                   <option value="inactive">Inactive</option>
-                  <option value="out_of_stock">Out of Stock</option>
+                  <option value="draft">Draft</option>
+                  <option value="discontinued">Discontinued</option>
                 </select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="images">Replace Images (max 3)</Label>
+                <Input
+                  id="images"
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                    const files = e.target.files ? Array.from(e.target.files).slice(0, 3) : []
+                    setEditingProduct({ ...editingProduct, imageFiles: files })
+                  }}
+                />
               </div>
             </div>
           )}
@@ -311,7 +329,7 @@ export function ProductsTable() {
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={() => editingProduct && handleSave(editingProduct)}>
+            <Button onClick={handleSave}>
               Save changes
             </Button>
           </DialogFooter>
@@ -319,4 +337,4 @@ export function ProductsTable() {
       </Dialog>
     </div>
   )
-} 
+}

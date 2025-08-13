@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useRouter } from "next/navigation"
+import { createProduct } from "@/lib/api"
 
 export function NewProductForm() {
   const router = useRouter()
@@ -14,19 +15,38 @@ export function NewProductForm() {
     name: "",
     description: "",
     price: "",
-    comparePrice: "",
     category: "",
     stock: "",
-    sku: "",
-    status: "active" as "active" | "inactive" | "out_of_stock",
-    shopId: "1" // Default shop ID
+    status: "active" as "active" | "inactive" | "draft" | "discontinued",
   })
+  const [images, setImages] = useState<File[]>([])
+  const [submitting, setSubmitting] = useState(false)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // Here you would typically save the product to your backend
-    console.log("Saving product:", formData)
-    router.push("/dashboard/products")
+    try {
+      setSubmitting(true)
+      await createProduct(
+        {
+          name: formData.name,
+          description: formData.description,
+          price: parseFloat(formData.price),
+          stock: parseInt(formData.stock || "0", 10),
+          category: formData.category,
+          status: formData.status,
+        },
+        images
+      )
+      router.push("/dashboard/products")
+    } catch (error: any) {
+      if (error?.message?.includes("Authentication required")) {
+        router.push("/login")
+      } else {
+        alert(error?.message || "Failed to create product")
+      }
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -85,20 +105,6 @@ export function NewProductForm() {
                   required
                 />
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="comparePrice">Compare Price (Optional)</Label>
-                <Input
-                  id="comparePrice"
-                  type="number"
-                  step="0.01"
-                  value={formData.comparePrice}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({
-                    ...formData,
-                    comparePrice: e.target.value
-                  })}
-                  placeholder="0.00"
-                />
-              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -131,36 +137,36 @@ export function NewProductForm() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="sku">SKU</Label>
-                <Input
-                  id="sku"
-                  value={formData.sku}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({
-                    ...formData,
-                    sku: e.target.value
-                  })}
-                  placeholder="Product SKU"
-                  required
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="status">Status</Label>
-                <select
-                  id="status"
-                  value={formData.status}
-                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormData({
-                    ...formData,
-                    status: e.target.value as "active" | "inactive" | "out_of_stock"
-                  })}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                  <option value="out_of_stock">Out of Stock</option>
-                </select>
-              </div>
+            <div className="grid gap-2">
+              <Label htmlFor="images">Images (max 3)</Label>
+              <Input
+                id="images"
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                  const files = e.target.files ? Array.from(e.target.files).slice(0, 3) : []
+                  setImages(files)
+                }}
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="status">Status</Label>
+              <select
+                id="status"
+                value={formData.status}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormData({
+                  ...formData,
+                  status: e.target.value as "active" | "inactive" | "draft" | "discontinued"
+                })}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="draft">Draft</option>
+                <option value="discontinued">Discontinued</option>
+              </select>
             </div>
           </CardContent>
         </Card>
@@ -169,7 +175,7 @@ export function NewProductForm() {
           <Button type="button" variant="outline" onClick={() => router.push("/dashboard/products")}>
             Cancel
           </Button>
-          <Button type="submit">
+          <Button type="submit" disabled={submitting}>
             Create Product
           </Button>
         </div>

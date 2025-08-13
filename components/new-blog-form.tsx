@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -9,17 +9,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { X, Plus } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { createBlog } from "@/lib/blogs"
 
 export function NewBlogForm() {
   const router = useRouter()
   const [formData, setFormData] = useState({
     title: "",
-    excerpt: "",
     content: "",
     status: "draft" as "draft" | "published",
     tags: [] as string[],
     newTag: ""
   })
+  const [featuredFile, setFeaturedFile] = useState<File | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   const handleAddTag = () => {
     if (formData.newTag.trim() && !formData.tags.includes(formData.newTag.trim())) {
@@ -38,11 +41,25 @@ export function NewBlogForm() {
     })
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // Here you would typically save the blog post to your backend
-    console.log("Saving blog post:", formData)
-    router.push("/dashboard/blogs")
+    if (!featuredFile) {
+      alert('Please select a featured image')
+      return
+    }
+    try {
+      setSubmitting(true)
+      await createBlog({
+        title: formData.title,
+        content: formData.content,
+        featuredImageFile: featuredFile,
+      })
+      router.push("/dashboard/blogs")
+    } catch (err: any) {
+      alert(err?.message || 'Failed to create blog')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -71,18 +88,11 @@ export function NewBlogForm() {
             </div>
             
             <div className="grid gap-2">
-              <Label htmlFor="excerpt">Excerpt</Label>
-              <Textarea
-                id="excerpt"
-                value={formData.excerpt}
-                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({
-                  ...formData,
-                  excerpt: e.target.value
-                })}
-                placeholder="Brief description of the blog post"
-                rows={3}
-                required
-              />
+              <Label htmlFor="featured_image">Featured image</Label>
+              <Input id="featured_image" ref={fileInputRef} type="file" accept="image/*" onChange={(e) => {
+                const f = e.target.files?.[0]
+                setFeaturedFile(f ?? null)
+              }} required />
             </div>
 
             <div className="grid gap-2">
@@ -161,8 +171,8 @@ export function NewBlogForm() {
           <Button type="button" variant="outline" onClick={() => router.push("/dashboard/blogs")}>
             Cancel
           </Button>
-          <Button type="submit">
-            {formData.status === "draft" ? "Save as Draft" : "Publish Post"}
+          <Button type="submit" disabled={submitting}>
+            {submitting ? 'Saving...' : formData.status === "draft" ? "Save as Draft" : "Publish Post"}
           </Button>
         </div>
       </form>

@@ -82,9 +82,7 @@ setIsLoggedin
 
   return (
    <isLoggedInContext.Provider value={values}>
-
-
-{children}
+     {!isLoading && children}
    </isLoggedInContext.Provider>
   )
 }

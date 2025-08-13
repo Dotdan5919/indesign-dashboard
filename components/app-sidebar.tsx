@@ -37,11 +37,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 
-import useProfile from "@/hooks/useProfile"
-
-
-
-
+import { useAuth } from "@/context/AuthContext"
 
 const data = {
   user: {
@@ -60,11 +56,7 @@ const data = {
       url: "/dashboard/blogs",
       icon: IconArticle,
     },
-    {
-      title: "Shops",
-      url: "/dashboard/shops",
-      icon: IconBuildingStore,
-    },
+    
     {
       title: "Products",
       url: "/dashboard/products",
@@ -147,7 +139,7 @@ const data = {
 }
 
 export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
-  const {profile,isLoading}=useProfile();
+  const { user, isLoading } = useAuth();
 
   if (isLoading) {
     return null; // or a loading spinner
@@ -173,7 +165,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
         <NavSecondary items={data.navSecondary} className="mt-auto"  />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={profile} />
+        <NavUser user={user} />
       </SidebarFooter>
     </Sidebar>
   );

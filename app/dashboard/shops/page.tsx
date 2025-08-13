@@ -9,9 +9,11 @@ import {
   SidebarInset,
   SidebarProvider,
 } from "@/components/ui/sidebar"
+import ProfileProvider from "@/context/ProfileContext"
 
 export default function ShopsPage() {
   return (
+    <ProfileProvider>
     <SidebarProvider
       style={
         {
@@ -48,5 +50,6 @@ export default function ShopsPage() {
         </div>
       </SidebarInset>
     </SidebarProvider>
+    </ProfileProvider>
   )
 } 

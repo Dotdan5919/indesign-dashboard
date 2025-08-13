@@ -1,72 +1,44 @@
 'use client'
-  import { cn } from "@/lib/utils"
-  import { Button } from "@/components/ui/button"
-  import { Input } from "@/components/ui/input"
-  import { Label } from "@/components/ui/label"
-  import Link from "next/link"
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+
+import { cn } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import Link from "next/link"
+import { useState } from "react"
 import { Spinner } from "@/components/ui/spinner"
+import { useAuth } from "@/context/AuthContext"
 
-interface formData{
-
-  email:string,
-  password:any
+interface FormData {
+  email: string;
+  password: string;
 }
-  export function LoginForm({
-    className,
-    ...props
-  }: React.ComponentProps<"form">) {
-    const [formData,setFormData]=useState<formData>({email:'',password:''});
+
+export function LoginForm({
+  className,
+  ...props
+}: React.ComponentProps<"form">) {
+    const [formData, setFormData] = useState<FormData>({ email: '', password: '' });
     const [error, setError] = useState("");
+    const { login, isLoading } = useAuth();
 
-    const router=useRouter();
-const [isLoading, setIsLoading] = useState(false);
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      setFormData(prev => ({
+        ...prev,
+        [e.target.name]: e.target.value
+      }));
+    };
 
-const handleChange=(e)=>{
-
-
-setFormData((prev)=>({...prev,[e.target.name]:e.target.value}));
-
-
-}
-
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  setIsLoading(true);
-  try {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/login`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      credentials: 'include',
-      body: JSON.stringify(formData),
-    });
-    if (!res.ok) {
-      const errorData = await res.json();
-      setIsLoading(false);
-      setError(errorData.message || 'Login failed');
-      throw new Error(errorData.message);
-    }
-    // Assume backend sets HTTP-only cookie
-    await res.json();
-    router.push('/dashboard');
-  } catch (err) {
-    setIsLoading(false);
-    setError(err.message || 'An error occurred');
-  }
-}
-
-
-    useEffect(()=>{
-
-
-
-
-
-    },[])
-
+    const handleSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      setError("");
+      
+      try {
+        await login(formData.email, formData.password);
+      } catch (error) {
+        setError(error instanceof Error ? error.message : 'Login failed');
+      }
+    };
 
     return (
       <form className={cn("flex flex-col gap-6", className)} {...props} onSubmit={handleSubmit} >

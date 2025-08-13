@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -32,71 +32,66 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
 import { Edit, MoreHorizontal, Trash2, Eye } from "lucide-react"
-
-interface Blog {
+import { ApiBlog, deleteBlog, fetchBlogs, getBlogImageUrl, updateBlog } from "@/lib/blogs"
+type BlogRow = {
   id: string
   title: string
   content: string
-  excerpt: string
   status: "draft" | "published" | "archived"
-  author: string
-  createdAt: string
-  updatedAt: string
+  author?: string
+  createdAt?: string
+  updatedAt?: string
   tags: string[]
-  image: string // URL to blog image
+  image?: string
 }
 
-const mockBlogs: Blog[] = [
-  {
-    id: "1",
-    title: "Getting Started with Next.js",
-    content: "Next.js is a powerful React framework...",
-    excerpt: "Learn how to build modern web applications with Next.js",
-    status: "published",
-    author: "John Doe",
-    createdAt: "2024-01-15",
-    updatedAt: "2024-01-20",
-    tags: ["Next.js", "React", "Web Development"],
-    image: "/next.svg"
-  },
-  {
-    id: "2",
-    title: "E-commerce Best Practices",
-    content: "Building a successful e-commerce platform...",
-    excerpt: "Essential strategies for creating a profitable online store",
-    status: "draft",
-    author: "Jane Smith",
-    createdAt: "2024-01-18",
-    updatedAt: "2024-01-18",
-    tags: ["E-commerce", "Business", "Marketing"],
-    image: "/vercel.svg"
-  },
-  {
-    id: "3",
-    title: "UI/UX Design Principles",
-    content: "Creating user-friendly interfaces...",
-    excerpt: "Key principles for designing intuitive user experiences",
-    status: "published",
-    author: "Mike Johnson",
-    createdAt: "2024-01-10",
-    updatedAt: "2024-01-15",
-    tags: ["Design", "UX", "UI"],
-    image: "/globe.svg"
-  }
-]
-
 export function BlogsTable() {
-  const [blogs, setBlogs] = useState<Blog[]>(mockBlogs)
-  const [editingBlog, setEditingBlog] = useState<Blog | null>(null)
+  const [blogs, setBlogs] = useState<BlogRow[]>([])
+  const [editingBlog, setEditingBlog] = useState<BlogRow | null>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [editImageFile, setEditImageFile] = useState<File | null>(null)
 
-  const handleEdit = (blog: Blog) => {
+  const loadBlogs = async () => {
+    setLoading(true)
+    try {
+      const apiBlogs = await fetchBlogs()
+      const rows: BlogRow[] = apiBlogs.map((b: ApiBlog) => ({
+        id: b._id,
+        title: b.title,
+        content: b.content,
+        status: (b.status?.toLowerCase() as any) || 'published',
+        author: b.author_id,
+        createdAt: b.createdAt,
+        updatedAt: b.updatedAt,
+        tags: [],
+        image: getBlogImageUrl(b.featured_image),
+      }))
+      setBlogs(rows)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadBlogs()
+  }, [])
+
+  const handleEdit = (blog: BlogRow) => {
     setEditingBlog(blog)
+    setEditImageFile(null)
     setIsEditDialogOpen(true)
   }
 
-  const handleDelete = (id: string) => {
-    setBlogs(blogs.filter(blog => blog.id !== id))
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteBlog(id)
+      setBlogs(blogs.filter(blog => blog.id !== id))
+    } catch (e: any) {
+      alert(e?.message || 'Failed to delete')
+    }
   }
 
   const handleSave = (updatedBlog: Blog) => {
@@ -122,6 +117,7 @@ export function BlogsTable() {
 
   return (
     <div className="space-y-4">
+      {loading && <div className="text-sm text-muted-foreground">Loading blogs...</div>}
       <div className="rounded-md border">
         <Table>
           <TableHeader>
@@ -139,10 +135,14 @@ export function BlogsTable() {
             {blogs.map((blog) => (
               <TableRow key={blog.id}>
                 <TableCell>
-                  <img src={blog.image} alt={blog.title} className="w-16 h-16 object-cover rounded" />
+                  {blog.image ? (
+                    <img src={blog.image} alt={blog.title} className="w-16 h-16 object-cover rounded" />
+                  ) : (
+                    <div className="w-16 h-16 bg-muted rounded" />
+                  )}
                 </TableCell>
                 <TableCell className="font-medium">{blog.title}</TableCell>
-                <TableCell>{blog.author}</TableCell>
+                <TableCell>{blog.author || '-'}</TableCell>
                 <TableCell>{getStatusBadge(blog.status)}</TableCell>
                 <TableCell>
                   <div className="flex gap-1 flex-wrap">
@@ -158,7 +158,7 @@ export function BlogsTable() {
                     )}
                   </div>
                 </TableCell>
-                <TableCell>{new Date(blog.createdAt).toLocaleDateString()}</TableCell>
+                <TableCell>{blog.createdAt ? new Date(blog.createdAt).toLocaleDateString() : '-'}</TableCell>
                 <TableCell className="text-right">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -204,17 +204,6 @@ export function BlogsTable() {
           {editingBlog && (
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
-                <Label htmlFor="image">Image URL</Label>
-                <Input
-                  id="image"
-                  value={editingBlog.image}
-                  onChange={(e) => setEditingBlog({
-                    ...editingBlog,
-                    image: e.target.value
-                  })}
-                />
-              </div>
-              <div className="grid gap-2">
                 <Label htmlFor="title">Title</Label>
                 <Input
                   id="title"
@@ -229,40 +218,21 @@ export function BlogsTable() {
                 <Label htmlFor="excerpt">Excerpt</Label>
                 <Textarea
                   id="excerpt"
-                  value={editingBlog.excerpt}
-                  onChange={(e) => setEditingBlog({
-                    ...editingBlog,
-                    excerpt: e.target.value
-                  })}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="content">Content</Label>
-                <Textarea
-                  id="content"
                   value={editingBlog.content}
                   onChange={(e) => setEditingBlog({
                     ...editingBlog,
                     content: e.target.value
                   })}
-                  rows={6}
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="status">Status</Label>
-                <select
-                  id="status"
-                  value={editingBlog.status}
-                  onChange={(e) => setEditingBlog({
-                    ...editingBlog,
-                    status: e.target.value as "draft" | "published" | "archived"
-                  })}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <option value="draft">Draft</option>
-                  <option value="published">Published</option>
-                  <option value="archived">Archived</option>
-                </select>
+                <Label htmlFor="featured_image_edit">Featured image</Label>
+                <Input
+                  id="featured_image_edit"
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setEditImageFile(e.target.files?.[0] ?? null)}
+                />
               </div>
             </div>
           )}
@@ -270,7 +240,22 @@ export function BlogsTable() {
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={() => editingBlog && handleSave(editingBlog)}>
+            <Button onClick={async () => {
+              if (!editingBlog) return
+              try {
+                const updated = await updateBlog({
+                  id: editingBlog.id,
+                  title: editingBlog.title,
+                  content: editingBlog.content,
+                  featuredImageFile: editImageFile ?? undefined,
+                })
+                await loadBlogs()
+                setIsEditDialogOpen(false)
+                setEditingBlog(null)
+              } catch (e: any) {
+                alert(e?.message || 'Failed to save changes')
+              }
+            }}>
               Save changes
             </Button>
           </DialogFooter>
