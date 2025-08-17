@@ -47,7 +47,7 @@ const [isloggedin,setIsLoggedin]=useState(false);
       const router=useRouter();
 
     
-    
+    ...
     useEffect(() => {
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/profile`, {
           method: "GET",
