@@ -39,7 +39,7 @@ export default function LoggedInProvider({children}:LoggedInType) {
 const [isloggedin,setIsLoggedin]=useState(false);
 
 
-git
+gi
 
   const [isLoading, setIsLoading] = useState(true);
 
